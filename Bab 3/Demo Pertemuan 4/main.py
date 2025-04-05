@@ -13,6 +13,10 @@ def main(args):
     if img_1 is None or img_2 is None:
         sys.exit("Error loading image files")
 
+    mask = np.zeros_like(img_1)
+    cv2.rectangle(mask, (900, 1100), (2600, 2400), 255, -1)
+
+
     results = {
         "Original": img_1,
         "Negative": image_negative(img_1),
@@ -21,9 +25,9 @@ def main(args):
         "Contrast Stretch": contrast_stretching(img_1),
         "Bit-Plane": bit_plane_slicing(img_1),
         "Subtraction": image_subtraction(img_1, img_2),
-        "AND Operation": logic_operations_and(img_1),
-        "OR Operation": logic_operations_or(img_1),
-        "XOR Operation": logic_operations_xor(img_1),
+        "AND Operation": logic_operations_and(img_1, mask),
+        "OR Operation": logic_operations_or(img_1, mask),
+        "XOR Operation": logic_operations_xor(img_1, mask),
     }
 
     fig, axs = plt.subplots(3, 4, figsize=(15, 6))
@@ -36,28 +40,6 @@ def main(args):
 
     plt.tight_layout()
     plt.show()
-
-
-def logic_operations_xor(img):
-    mask = np.zeros_like(img)
-    cv2.rectangle(mask, (900, 1100), (2600, 2400), 255, -1)
-    return cv2.bitwise_xor(img, mask)
-
-
-def logic_operations_or(img):
-    mask = np.zeros_like(img)
-    cv2.rectangle(mask, (900, 1100), (2600, 2400), 255, -1)
-    return cv2.bitwise_or(img, mask)
-
-
-def logic_operations_and(img):
-    mask = np.zeros_like(img)
-    cv2.rectangle(mask, (900, 1100), (2600, 2400), 255, -1)
-    return cv2.bitwise_and(img, mask)
-
-
-def image_subtraction(img1, img2):
-    return cv2.subtract(img1, img2)
 
 
 def bit_plane_slicing(img, bit_plane=8):
@@ -75,8 +57,24 @@ def contrast_stretching(img, r1=55, s1=40, r2=140, s2=200):
     return p.astype(np.uint8)
 
 
-def power_law_transformations(img, gamma=1.5):
-    return (255 * (img.astype(np.float32)/255)**gamma * 255).astype(np.uint8)
+def logic_operations_xor(img, mask):
+    return cv2.bitwise_xor(img, mask)
+
+
+def logic_operations_or(img, mask):
+    return cv2.bitwise_or(img, mask)
+
+
+def logic_operations_and(img, mask):
+    return cv2.bitwise_and(img, mask)
+
+
+def image_subtraction(img1, img2):
+    return cv2.subtract(img1, img2)
+
+
+def power_law_transformations(img, gamma=1.5, c=255):
+    return (c * np.power(img / c, gamma)).astype(np.uint8)
 
 
 def log_transformations(img):
@@ -85,7 +83,7 @@ def log_transformations(img):
 
 
 def image_negative(img):
-    return 255 - img
+    return np.max(img) - img
 
 
 if __name__ == "__main__":
