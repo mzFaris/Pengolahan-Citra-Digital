@@ -42,19 +42,32 @@ def main(args):
     plt.show()
 
 
-def bit_plane_slicing(img, bit_plane=8):
-    return ((img >> (bit_plane - 1)) & 1) * 255
+def bit_plane_slicing(img):
+    bit_plane = img.copy()
+    bit_plane_no = 8
+
+    for i in range(0, img.shape[0]):
+        for j in range(0, img.shape[1]):
+            bit_plane[i,j] = (img[i,j] & 2**(bit_plane_no-1))
+    
+    return bit_plane
 
 
 def contrast_stretching(img, r1=55, s1=40, r2=140, s2=200):
-    img = img.astype(np.float32)
-    p = np.clip(np.select(
-        [img <= r1, (img > r1) & (img <= r2), img > r2],
-        [(s1/r1)*img, 
-         ((s2-s1)/(r2-r1))*(img-r1)+s1,
-         ((255-s2)/(255-r2))*(img-r2)+s2]
-    ), 0, 255)
-    return p.astype(np.uint8)
+    stretched = np.zeros_like(img, dtype=np.float32)
+    r_max, s_max = 255, 255  
+    
+    mask_A = img < r1
+    mask_B = (img >= r1) & (img <= r2)
+    mask_C = img > r2
+    
+    stretched[mask_A] = (s1 / r1) * img[mask_A]
+    stretched[mask_B] = ((s2 - s1) / (r2 - r1)) * (img[mask_B] - r1) + s1
+    stretched[mask_C] = ((s_max - s2) / (r_max - r2)) * (img[mask_C] - r2) + s2
+
+    stretched = np.clip(stretched, 0, 255).astype(np.uint8)
+
+    return stretched
 
 
 def logic_operations_xor(img, mask):
