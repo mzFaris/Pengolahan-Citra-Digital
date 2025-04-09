@@ -1,52 +1,59 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import argparse
+import math
 import sys
 import cv2
-import argparse
-import numpy as np
-from pathlib import Path
-import matplotlib.pyplot as plt
 
-def main(args):
-    img = cv2.imread(str(Path(args.path)), cv2.COLOR_BGR2RGB)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("image_path", help="image from path that will be processed")
+    args = parser.parse_args()
+
+    img = cv2.imread(args.image_path)
     if img is None:
-        sys.exit("File not found")
+        sys.exit("File not found!")
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     results = {
-        "Original": img_rgb,
+        "Original Image": img_rgb,
         "Light Method": light_method(img),
         "Average Method": avg_method(img),
         "Luminosity Method": lum_method(img),
     }
 
-    fig, axs = plt.subplots(2, 2, figsize=(15, 4))
-    axes = axs.ravel()
+    row = 2
+    col = math.ceil(len(results) / row)
 
-    for (title, img), ax in zip(results.items(), axes):
-        ax.imshow(img, cmap="gray")
-        ax.set_title(title)
-        ax.axis("off")
+    fig, axes = plt.subplots(row, col, figsize=(15, 5))
+    axes = axes.flatten()
+
+    for i, (title, image) in enumerate(results.items()):
+        axes[i].imshow(image, cmap="gray")
+        axes[i].set_title(title)
+        axes[i].axis("off")
 
     plt.tight_layout()
     plt.show()
 
 
 def avg_method(img):
-    return np.round(np.mean(img, axis=2)).astype(np.uint8)
+    b, g, r = cv2.split(img)
+    return (r.astype(float) + g.astype(float) + b.astype(float) / 3).astype(np.uint8)
 
 
 def light_method(img):
-    max_val = np.max(img, axis=2)
-    min_val = np.min(img, axis=2)
-    return np.round((max_val + min_val) / 2).astype(np.uint8)
+    b, g, r = cv2.split(img)
+    max_val = np.maximum(np.maximum(r, g), b).astype(float)
+    min_val = np.minimum(np.minimum(r, g), b).astype(float)
+    return ((max_val + min_val) / 2).astype(np.uint8)
 
 
 def lum_method(img):
-    return np.round(0.299 * img[:, :, 0] + 0.587 * img[:, :, 1] + 0.114 * img[:, :, 2]).astype(np.uint8)
+    b, g, r = cv2.split(img)
+    return (0.21 * r + 0.71 * g + 0.07 * b).astype(np.uint8)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("path")
-    args = parser.parse_args()
-    main(args)
+    main()

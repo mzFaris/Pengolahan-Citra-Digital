@@ -1,106 +1,114 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import argparse
+import math
 import cv2
 import sys
-import argparse
-import numpy as np
-from pathlib import Path
-import matplotlib.pyplot as plt
 
 
-def main(args):
-    img_1 = cv2.imread(str(Path(args.image1)), cv2.IMREAD_GRAYSCALE)
-    img_2 = cv2.imread(str(Path(args.image2)), cv2.IMREAD_GRAYSCALE)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("image_path1", help="image1 from path that will be processed")
+    parser.add_argument("image_path2", help="image2 from path that will be processed")
+    args = parser.parse_args()
+
+    img1 = cv2.imread(args.image_path1, cv2.IMREAD_GRAYSCALE)
+    img2 = cv2.imread(args.image_path2, cv2.IMREAD_GRAYSCALE)
     
-    if img_1 is None or img_2 is None:
+    if img1 is None or img2 is None:
         sys.exit("Error loading image files")
-
-    mask = np.zeros_like(img_1)
-    cv2.rectangle(mask, (900, 1100), (2600, 2400), 255, -1)
-
-
+    
     results = {
-        "Original": img_1,
-        "Negative": image_negative(img_1),
-        "Log Transform": log_transformations(img_1),
-        "Power-Law": power_law_transformations(img_1),
-        "Contrast Stretch": contrast_stretching(img_1),
-        "Bit-Plane": bit_plane_slicing(img_1),
-        "Subtraction": image_subtraction(img_1, img_2),
-        "AND Operation": logic_operations_and(img_1, mask),
-        "OR Operation": logic_operations_or(img_1, mask),
-        "XOR Operation": logic_operations_xor(img_1, mask),
+        "Original": img1,
+        "Negative": image_negative(img1),
+        "Log Transform": log_transformations(img1),
+        "Power-Law": power_law_transformations(img1),
+        "Contrast Stretch": contrast_stretching(img1),
+        "Bit-Plane": bit_plane_slicing(img1)[7],
+        "Subtraction": image_subtraction(img1, img2),
+        "AND Operation": logic_operations_and(img1, img2),
+        "OR Operation": logic_operations_or(img1, img2),
+        "XOR Operation": logic_operations_xor(img1, img2),
     }
 
-    fig, axs = plt.subplots(3, 4, figsize=(15, 6))
-    axes = axs.ravel()
-    
-    for (title, img), ax in zip(results.items(), axes):
-        ax.imshow(img, cmap="gray")
-        ax.set_title(title)
-        ax.axis("off")
+    row = 3
+    col = math.ceil(len(results) / row)
+
+    fig, axes = plt.subplots(row, col, figsize=(15, 5))
+    axes = axes.flatten()
+
+    for i, (title, image) in enumerate(results.items()):
+        axes[i].imshow(image, cmap="gray")
+        axes[i].set_title(title)
+        axes[i].axis("off")
 
     plt.tight_layout()
     plt.show()
 
 
 def bit_plane_slicing(img):
-    bit_plane = img.copy()
-    bit_plane_no = 8
-
-    for i in range(0, img.shape[0]):
-        for j in range(0, img.shape[1]):
-            bit_plane[i,j] = (img[i,j] & 2**(bit_plane_no-1))
+    height, width = img.shape
+    bit_planes = []
     
-    return bit_plane
+    for i in range(8):
+        bit_plane = np.zeros((height, width), dtype=np.uint8)
+        for row in range(height):
+            for col in range(width):
+                if (img[row][col] >> i) & 1:
+                    bit_plane[row, col] = 255
+        bit_planes.append(bit_plane)
+
+    return bit_planes
 
 
-def contrast_stretching(img, r1=55, s1=40, r2=140, s2=200):
-    stretched = np.zeros_like(img, dtype=np.float32)
-    r_max, s_max = 255, 255  
+def contrast_stretching(img):
+    min_out = 0
+    max_out = 255
+    min_in = np.min(img)
+    max_in = np.max(img)
     
-    mask_A = img < r1
-    mask_B = (img >= r1) & (img <= r2)
-    mask_C = img > r2
-    
-    stretched[mask_A] = (s1 / r1) * img[mask_A]
-    stretched[mask_B] = ((s2 - s1) / (r2 - r1)) * (img[mask_B] - r1) + s1
-    stretched[mask_C] = ((s_max - s2) / (r_max - r2)) * (img[mask_C] - r2) + s2
-
-    stretched = np.clip(stretched, 0, 255).astype(np.uint8)
-
-    return stretched
+    if min_in == max_in:
+        stretched_img = img.copy()
+    else:
+        stretched_img = (img - min_in) * (max_out - min_out) / (max_in - min_in) + min_out
+        stretched_img = np.clip(stretched_img, min_out, max_out).astype(np.uint8)
+    return stretched_img
 
 
-def logic_operations_xor(img, mask):
-    return cv2.bitwise_xor(img, mask)
+def logic_operations_xor(img1, img2):
+    return cv2.bitwise_xor(img1, img2)
 
 
-def logic_operations_or(img, mask):
-    return cv2.bitwise_or(img, mask)
+def logic_operations_or(img1, img2):
+    return cv2.bitwise_or(img1, img2)
 
 
-def logic_operations_and(img, mask):
-    return cv2.bitwise_and(img, mask)
+def logic_operations_and(img1, img2):
+    return cv2.bitwise_and(img1, img2)
 
 
 def image_subtraction(img1, img2):
     return cv2.subtract(img1, img2)
 
 
-def power_law_transformations(img, gamma=1.5, c=255):
-    return (c * np.power(img / c, gamma)).astype(np.uint8)
+def power_law_transformations(img):
+    gamma = 2.0
+    c = 1.0
+    img_normalized = img / 255.0
+    power_law_img_normalized = c * (img_normalized ** gamma)
+    return np.clip(power_law_img_normalized * 255, 0, 255).astype(np.uint8)
 
 
 def log_transformations(img):
-    c = 255 / np.log(256)
-    return (c * np.log(img.astype(np.float32) + 1)).astype(np.uint8)
+    c = 1.0
+    img_normalized = img / 255.0
+    log_img_normalized = c * np.log(1 + img_normalized)
+    return np.clip(log_img_normalized * 255, 0, 255).astype(np.uint8)
 
 
 def image_negative(img):
-    return np.max(img) - img
+    return cv2.minMaxLoc(img)[1] - img
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("image1")
-    parser.add_argument("image2")
-    main(parser.parse_args())
+    main()
